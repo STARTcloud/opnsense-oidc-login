@@ -18,7 +18,12 @@ try {
     }
     $claims = $client->logoutClaims($client->discovery(), (string)$_POST['logout_token']);
     $ended = (new Sessions())->end((string)($claims['sid'] ?? ''), (string)($claims['sub'] ?? ''));
-    auth_log(sprintf("Web GUI OIDC back-channel logout from %s ended %d session(s)", $_SERVER['REMOTE_ADDR'], $ended), LOG_NOTICE);
+    auth_log(sprintf(
+        "Web GUI OIDC back-channel logout from %s ended %d session(s); the logout token %s a session identifier",
+        $_SERVER['REMOTE_ADDR'],
+        $ended,
+        empty($claims['sid']) ? 'carries no' : 'carries'
+    ), LOG_NOTICE);
     http_response_code(200);
 } catch (\Throwable $error) {
     auth_log(sprintf("Web GUI OIDC back-channel logout error from %s: %s", $_SERVER['REMOTE_ADDR'], $error->getMessage()));

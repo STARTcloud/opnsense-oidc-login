@@ -46,7 +46,10 @@ class Sessions
     {
         $ended = 0;
         foreach ($this->entries() as $handle => $entry) {
-            $match = $sid !== '' ? ($entry['sid'] ?? '') === $sid : ($entry['sub'] ?? '') === $subject;
+            $known = (string)($entry['sid'] ?? '');
+            $match = $sid !== '' && $known !== ''
+                ? $known === $sid
+                : $subject !== '' && ($entry['sub'] ?? '') === $subject;
             if ($match) {
                 $file = $this->sessionFile((string)($entry['session'] ?? ''));
                 if (is_file($file)) {
