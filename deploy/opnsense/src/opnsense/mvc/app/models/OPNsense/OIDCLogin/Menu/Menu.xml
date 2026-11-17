@@ -1,0 +1,7 @@
+<menu>
+    <System>
+        <Access>
+            <OIDCLogin VisibleName="OIDC Login" url="/ui/oidclogin/"/>
+        </Access>
+    </System>
+</menu>

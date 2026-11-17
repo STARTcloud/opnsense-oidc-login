@@ -1,0 +1,236 @@
+---
+name: OPNsense Plugin Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to build'
+        required: true
+        type: string
+      tag_name:
+        description: 'GitHub release tag'
+        required: true
+        type: string
+      devel:
+        description: 'Build the development package (os-oidc-login-devel)'
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build'
+        required: true
+        type: string
+      tag_name:
+        description: 'GitHub release tag'
+        required: true
+        type: string
+      devel:
+        description: 'Build the development package (os-oidc-login-devel)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: pkg-publish
+  cancel-in-progress: false
+
+jobs:
+  build-opnsense-plugin:
+    name: os-oidc-login
+    runs-on: self-hosted
+    env:
+      BUILDER: ghrunner@opnsense.startcloud.com
+      BUILD_DIR: /local/builds/os-oidc-login
+      OPNSENSE_PLUGINS_DIR: /local/opnsense-plugins
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set package name
+        run: |
+          if [ "${{ inputs.devel }}" = "true" ]; then
+            {
+              echo "PACKAGE_NAME=os-oidc-login-devel"
+              echo "PLUGIN_DEVEL_VAL=yes"
+            } >> "$GITHUB_ENV"
+          else
+            {
+              echo "PACKAGE_NAME=os-oidc-login"
+              echo "PLUGIN_DEVEL_VAL=no"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Clean FreeBSD build dir
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new "$BUILDER" \
+              bash -s -- "$BUILD_DIR" <<'REMOTE'
+          set -euo pipefail
+          build_dir=$1
+          rm -rf "$build_dir"
+          mkdir -p "$build_dir"
+          REMOTE
+
+      - name: Sync source to FreeBSD
+        run: |
+          rsync -av --delete \
+            --exclude='/.git' \
+            --exclude='/pkg-out' \
+            --exclude='*.pkg' \
+            ./ "$BUILDER:$BUILD_DIR/"
+
+      - name: Ensure opnsense/plugins checkout, copy, build
+        run: |
+          ssh "$BUILDER" bash -s -- \
+              "$OPNSENSE_PLUGINS_DIR" "$BUILD_DIR" "$VERSION" "$PLUGIN_DEVEL_VAL" <<'REMOTE'
+          set -euo pipefail
+          plugins_dir=$1
+          build_dir=$2
+          version=$3
+          plugin_devel=$4
+
+          [ "$plugin_devel" = "no" ] && plugin_devel=""
+
+          if [ ! -d "$plugins_dir/.git" ]; then
+              git clone --depth 1 https://github.com/opnsense/plugins.git "$plugins_dir"
+          else
+              cd "$plugins_dir"
+              git fetch --depth 1 origin master 2>/dev/null
+              git reset --hard origin/master
+          fi
+
+          rm -rf "$plugins_dir/security/oidc-login"
+          cp -R "$build_dir/deploy/opnsense" "$plugins_dir/security/oidc-login"
+
+          cd "$plugins_dir/security/oidc-login"
+          for tuple in "FreeBSD:14:amd64 1403000 14.3-RELEASE" "FreeBSD:15:amd64 1501000 15.1-RELEASE"; do
+              set -- $tuple
+              abi=$1
+              osversion=$2
+              uname_r=$3
+              rm -rf work
+              env ABI="$abi" OSVERSION="$osversion" UNAME_r="$uname_r" make package \
+                  PLUGIN_VERSION="$version" \
+                  PLUGIN_DEVEL="$plugin_devel"
+              mkdir -p "$build_dir/pkg-out/$abi"
+              cp work/pkg/*.pkg "$build_dir/pkg-out/$abi/"
+              ls -la "$build_dir/pkg-out/$abi/"
+          done
+          REMOTE
+
+      - name: Pull package back
+        run: |
+          rsync -av "$BUILDER:$BUILD_DIR/pkg-out/" ./pkg-out/
+          ls -laR pkg-out/
+
+      - name: Resolve package filename + checksum
+        run: |
+          PKG_FILE=$(find pkg-out/FreeBSD:15:amd64 -maxdepth 1 -name "${PACKAGE_NAME}-${VERSION}.*" | head -n 1)
+          if [ -z "$PKG_FILE" ]; then
+            echo "No package file matching ${PACKAGE_NAME}-${VERSION}.* in pkg-out/FreeBSD:15:amd64/" >&2
+            ls -laR pkg-out/ >&2
+            exit 1
+          fi
+          cp "$PKG_FILE" ./
+          PKG_BASENAME=$(basename "$PKG_FILE")
+          sha256sum "$PKG_BASENAME" > "${PKG_BASENAME}.sha256"
+          echo "PKG_FILE=$PKG_BASENAME" >> "$GITHUB_ENV"
+          echo "PKG_SHA256=${PKG_BASENAME}.sha256" >> "$GITHUB_ENV"
+          ls -lh "$PKG_BASENAME" "${PKG_BASENAME}.sha256"
+
+      - name: Publish to OPNsense public repo (dual-ABI)
+        run: |
+          ssh "$BUILDER" bash -s -- "$BUILD_DIR" <<'REMOTE'
+          set -euo pipefail
+          build_dir=$1
+          for abi in FreeBSD:14:amd64 FreeBSD:15:amd64; do
+              repo_dir="/local/public/opnsense/$abi"
+              mkdir -p "$repo_dir/All"
+              cp "$build_dir/pkg-out/$abi/"*.pkg "$repo_dir/All/"
+              chmod 0644 "$repo_dir/All/"*.pkg
+              sudo pkg repo "$repo_dir" /usr/local/etc/ssl/pkg-repo/opnsense.key
+              bsdtar -xOf "$repo_dir/packagesite.pkg" packagesite.yaml \
+                  > "$repo_dir/packagesite.yaml"
+          done
+          REMOTE
+
+      - name: Install cosign
+        if: ${{ !inputs.devel }}
+        uses: sigstore/cosign-installer@v3
+
+      - name: Install syft
+        if: ${{ !inputs.devel }}
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Sign package with cosign (keyless)
+        if: ${{ !inputs.devel }}
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+        run: |
+          cosign sign-blob --yes \
+            --bundle "${PKG_FILE}.bundle" \
+            "$PKG_FILE"
+          {
+            echo "PKG_BUNDLE=${PKG_FILE}.bundle"
+          } >> "$GITHUB_ENV"
+
+      - name: Generate SBOM (SPDX JSON)
+        if: ${{ !inputs.devel }}
+        run: |
+          syft scan "file:./${PKG_FILE}" -o spdx-json="${PKG_FILE}.spdx.json"
+          {
+            echo "PKG_SBOM=${PKG_FILE}.spdx.json"
+          } >> "$GITHUB_ENV"
+
+      - name: Install GitHub CLI
+        run: |
+          if ! command -v gh &> /dev/null; then
+            sudo apt update && sudo apt install -y gh
+          fi
+
+      - name: Upload package to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag_name }}
+        run: |
+          gh release upload "$TAG" "$PKG_FILE" --clobber
+          gh release upload "$TAG" "$PKG_SHA256" --clobber
+          if [ -n "${PKG_BUNDLE:-}" ]; then
+            gh release upload "$TAG" "$PKG_BUNDLE" --clobber
+          fi
+          if [ -n "${PKG_SBOM:-}" ]; then
+            gh release upload "$TAG" "$PKG_SBOM" --clobber
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: opnsense-plugin
+          path: |
+            *.pkg
+            *.pkg.sha256
+            *.pkg.bundle
+            *.pkg.spdx.json
+          retention-days: 30
+
+      - name: Clean up FreeBSD build dir
+        if: always()
+        run: |
+          ssh "$BUILDER" bash -s -- "$BUILD_DIR" <<'REMOTE' 2>/dev/null || true
+          set -euo pipefail
+          build_dir=$1
+          rm -rf "$build_dir"
+          REMOTE
+
+      - name: Summary
+        run: |
+          echo "OPNsense plugin built:"
+          echo "- Version: ${VERSION}"
+          echo "- Package: ${PKG_FILE}"

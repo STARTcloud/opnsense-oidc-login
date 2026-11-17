@@ -1,0 +1,10 @@
+<acl>
+    <page-system-access-oidclogin>
+        <name>WebCfg - System: Access: OIDC Login</name>
+        <description>Allow access to the OpenID Connect sign-in settings</description>
+        <patterns>
+            <pattern>ui/oidclogin/*</pattern>
+            <pattern>api/oidclogin/*</pattern>
+        </patterns>
+    </page-system-access-oidclogin>
+</acl>

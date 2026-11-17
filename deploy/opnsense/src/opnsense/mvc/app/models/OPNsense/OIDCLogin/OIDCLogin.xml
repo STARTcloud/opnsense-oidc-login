@@ -1,0 +1,77 @@
+<model>
+    <mount>//OPNsense/oidclogin</mount>
+    <description>
+        OpenID Connect sign-in settings for the web GUI.
+    </description>
+    <items>
+        <general>
+            <Enabled type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </Enabled>
+            <Name type="TextField">
+                <Default>Single Sign-On</Default>
+                <Required>Y</Required>
+            </Name>
+            <PrimaryButton type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </PrimaryButton>
+            <HideLocal type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </HideLocal>
+            <AutoSignIn type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </AutoSignIn>
+            <Issuer type="TextField">
+                <Required>N</Required>
+                <Mask>/^https:\/\/\S+$/</Mask>
+                <ValidationMessage>The issuer is an https URL.</ValidationMessage>
+            </Issuer>
+            <ClientId type="TextField">
+                <Required>N</Required>
+            </ClientId>
+            <ClientSecret type="UpdateOnlyTextField">
+                <Required>N</Required>
+            </ClientSecret>
+            <Scopes type="TextField">
+                <Default>openid profile email</Default>
+                <Required>Y</Required>
+                <Mask>/^[A-Za-z0-9_:. -]+$/</Mask>
+            </Scopes>
+            <UsernameClaim type="TextField">
+                <Default>email</Default>
+                <Required>Y</Required>
+                <Mask>/^[A-Za-z0-9_]+$/</Mask>
+            </UsernameClaim>
+            <Prompt type="OptionField">
+                <Required>N</Required>
+                <BlankDesc>Provider decides</BlankDesc>
+                <OptionValues>
+                    <login>Always ask for credentials</login>
+                    <select_account>Always ask which account</select_account>
+                </OptionValues>
+            </Prompt>
+            <ProviderLogout type="BooleanField">
+                <Default>1</Default>
+                <Required>Y</Required>
+            </ProviderLogout>
+        </general>
+        <users>
+            <user type="ArrayField">
+                <enabled type="BooleanField">
+                    <Default>1</Default>
+                    <Required>Y</Required>
+                </enabled>
+                <username type="TextField">
+                    <Required>Y</Required>
+                </username>
+                <subject type="TextField">
+                    <Required>Y</Required>
+                </subject>
+            </user>
+        </users>
+    </items>
+</model>

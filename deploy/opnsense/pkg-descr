@@ -1,0 +1,10 @@
+OpenID Connect sign-in for the OPNsense web GUI.
+
+Adds a sign-in link to the login page. The link sends the browser to an
+OpenID Provider with the authorization code flow and PKCE; on return the
+plugin exchanges the code at the token endpoint and starts the web GUI
+session for the local user the ID token names.
+
+Only users that already exist on the firewall can sign in. Their groups
+and privileges stay as configured. Password sign-in, SSH and the console
+are unchanged.

@@ -1,0 +1,25 @@
+<form>
+    <field>
+        <id>user.enabled</id>
+        <label>Enabled</label>
+        <type>checkbox</type>
+        <help>Enable this mapping.</help>
+        <grid_view>
+            <width>6em</width>
+            <type>boolean</type>
+            <formatter>rowtoggle</formatter>
+        </grid_view>
+    </field>
+    <field>
+        <id>user.username</id>
+        <label>Local user</label>
+        <type>text</type>
+        <help>The name of the firewall user that is signed in.</help>
+    </field>
+    <field>
+        <id>user.subject</id>
+        <label>Provider account</label>
+        <type>text</type>
+        <help>The value of the username claim that signs this user in, for example an email address.</help>
+    </field>
+</form>

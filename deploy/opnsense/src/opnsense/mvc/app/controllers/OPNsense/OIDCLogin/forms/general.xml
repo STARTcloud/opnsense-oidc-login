@@ -1,0 +1,83 @@
+<form>
+    <field>
+        <type>header</type>
+        <label>Login page</label>
+    </field>
+    <field>
+        <id>oidclogin.general.Enabled</id>
+        <label>Enabled</label>
+        <type>checkbox</type>
+        <help>Show the sign-in button on the login page.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.Name</id>
+        <label>Button text</label>
+        <type>text</type>
+        <help>The text on the sign-in button.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.PrimaryButton</id>
+        <label>Primary button</label>
+        <type>checkbox</type>
+        <help>Draw the sign-in button in the theme's primary colour.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.HideLocal</id>
+        <label>Hide password login</label>
+        <type>checkbox</type>
+        <help>Hide the username and password form. The form is shown again when the login page is opened with ?local on its address; password login itself stays available.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.AutoSignIn</id>
+        <label>Sign in automatically</label>
+        <type>checkbox</type>
+        <help>Send the browser to the provider as soon as the login page opens. The page stays put after a refused or failed sign-in and when opened with ?local on its address.</help>
+    </field>
+
+    <field>
+        <type>header</type>
+        <label>OpenID Provider</label>
+    </field>
+    <field>
+        <id>oidclogin.general.Issuer</id>
+        <label>Issuer</label>
+        <type>text</type>
+        <help>The provider's issuer URL. Its discovery document is read from /.well-known/openid-configuration below it.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.ClientId</id>
+        <label>Client ID</label>
+        <type>text</type>
+        <help>The client registered at the provider with the authorization code grant and the redirect URI https://this-firewall/oidc_callback.php.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.ClientSecret</id>
+        <label>Client secret</label>
+        <type>password</type>
+        <help>Sent to the token endpoint as client_secret_basic. Leave empty to keep the stored value.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.Scopes</id>
+        <label>Scopes</label>
+        <type>text</type>
+        <help>Space-separated scopes requested; openid is required.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.UsernameClaim</id>
+        <label>Username claim</label>
+        <type>text</type>
+        <help>The claim whose value is looked up on the Users tab, read from the ID token or, when absent there, from the UserInfo endpoint. A value with no enabled entry, or an entry naming no enabled local user, is refused.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.Prompt</id>
+        <label>Prompt</label>
+        <type>dropdown</type>
+        <help>What the provider asks at every sign-in.</help>
+    </field>
+    <field>
+        <id>oidclogin.general.ProviderLogout</id>
+        <label>Sign out at the provider</label>
+        <type>checkbox</type>
+        <help>When a session started through the link ends on this firewall, revoke its token and end the session at the provider. The provider needs https://this-firewall/ as a post-logout redirect URI.</help>
+    </field>
+</form>
